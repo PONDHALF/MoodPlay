@@ -13,6 +13,7 @@ When you step away from your desk, MoodPlay fades in an ambient view of the song
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
 ![Spotify](https://img.shields.io/badge/works%20with-Spotify%20desktop-1DB954?logo=spotify&logoColor=white)
 [![Release](https://img.shields.io/github/v/release/PONDHALF/MoodPlay?label=download&color=8E5CFF)](https://github.com/PONDHALF/MoodPlay/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 </div>
 
@@ -35,6 +36,7 @@ When you step away from your desk, MoodPlay fades in an ambient view of the song
 - [Project structure](#project-structure)
 - [Contributing](#contributing)
 - [Credits](#credits)
+- [License](#license)
 
 ---
 
@@ -344,6 +346,12 @@ Ideas on the roadmap: Apple Music support, more themes (e.g. a visualizer), and 
 
 > MoodPlay isn't affiliated with, endorsed by, or connected to Spotify AB.
 > "Spotify" is a trademark of Spotify AB.
+
+---
+
+## License
+
+MoodPlay is released under the [MIT License](LICENSE). You're free to use, modify, and share it, as long as you keep the copyright notice.
 
 <div align="center">
 <sub>Made by <a href="https://github.com/PONDHALF">PONDHALF</a></sub>
