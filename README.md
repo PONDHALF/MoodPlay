@@ -47,7 +47,7 @@ Whenever your Mac is locked, MoodPlay shows the song you're playing right on the
 | 🔒 **Lives on the Lock Screen** | Your music shows up on the real macOS Lock Screen. The clock, password field, and Touch ID stay exactly where macOS puts them. |
 | 🖼️ **Blends with your wallpaper** | No background or overlay. Artwork and text sit directly on your Lock Screen wallpaper with a soft shadow for readability. |
 | 🎯 **Smart layout** | With lyrics: artwork on the left, lyrics on the right. Without lyrics (turned off, not found, or instrumental): everything is centered. Both fit between the system clock and the unlock controls. |
-| 💿 **Two themes** | **Album cover**: the cover with the track details. **Vinyl**: a spinning record with the cover as its label and a tonearm that lifts when you pause. |
+| 💿 **Two themes** | **Album Cover**: the cover with the track details. **Vinyl**: a spinning record with the cover as its label and a tonearm that lifts when you pause. |
 | 🎤 **Synced lyrics** | Time-synced lyrics from [LRCLIB](https://lrclib.net). The current line is highlighted and centered, and nearby lines softly blur. Instrumental breaks show animated dots. |
 | 🔐 **Follows macOS locking** | Shows up however your Mac gets locked: automatically by macOS, with **⌃⌘Q**, or with MoodPlay's **⌘⇧M** hotkey. |
 | 🖥️ **Every display** | Shows on all connected screens and adapts when displays are added or removed. |
@@ -71,7 +71,7 @@ Whenever your Mac is locked, MoodPlay shows the song you're playing right on the
 1. Go to the [**latest release**](https://github.com/PONDHALF/MoodPlay/releases/latest) and download **`MoodPlay-x.y.z.dmg`**.
 2. Open the DMG and drag **MoodPlay** into **Applications**.
 3. Open MoodPlay from **Applications**. A waveform icon appears in the menu bar.
-4. In the MoodPlay menu, turn on **Launch at login** if you want it to start with your Mac.
+4. In the MoodPlay menu, turn on **Launch at Login** if you want it to start with your Mac.
 
 The app is a universal build, so it runs natively on both Apple Silicon and Intel Macs.
 
@@ -148,7 +148,7 @@ No Accessibility or Screen Recording permission is needed. The ⌘⇧M hotkey us
 
 1. Play something in Spotify.
 2. Lock your Mac any way you like:
-   - press **⌘⇧M** (or choose **Lock & show now** in the menu) when you get up,
+   - press **⌘⇧M** (or choose **Lock & Show Now** in the menu) when you get up,
    - press **⌃⌘Q**, or
    - let macOS lock it automatically.
 
@@ -167,14 +167,12 @@ Click the **waveform** icon in the menu bar:
 
 | Item | Description |
 |---|---|
-| *Now playing* | The current track and whether it's playing or paused. |
-| **Theme** | **Album cover** or **Vinyl**. |
-| **Show lyrics** | On: artwork on the left, lyrics on the right. Off: artwork and track details centered. |
-| **Lock & show now ⌘⇧M** | Lock the Mac immediately and show your music. |
-| **Launch at login** | Start MoodPlay when you log in. |
+| *Now Playing* | The current track and whether it's playing or paused. |
+| **Theme** | **Album Cover** or **Vinyl**. |
+| **Show Lyrics** | On: artwork on the left, lyrics on the right. Off: artwork and track details centered. |
+| **Lock & Show Now ⌘⇧M** | Lock the Mac immediately and show your music. |
+| **Launch at Login** | Start MoodPlay when you log in. |
 | **Quit MoodPlay** | ⌘Q |
-
-> The app's interface is currently in Thai. The items above are shown in English for readability.
 
 ---
 
@@ -247,7 +245,7 @@ MoodPlay is built to be close to free when you're not looking at it.
 <details>
 <summary><b>The menu says nothing is playing, but Spotify is playing</b></summary>
 
-- Check for a permission warning in the menu and click **Open permission settings…**.
+- Check for a permission warning in the menu and click **Open Permission Settings…**.
 - Make sure you're using the Spotify **desktop app**, not the web player.
 - Reset the permission and try again:
   ```bash

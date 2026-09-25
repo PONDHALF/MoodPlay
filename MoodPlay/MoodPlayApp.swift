@@ -29,30 +29,30 @@ struct MenuContent: View {
         if let track = spotify.track {
             Text(verbatim: "\(spotify.isPlaying ? "▶︎" : "❚❚")  \(track.name) — \(track.artist)")
         } else {
-            Text("ไม่มีเพลงที่เล่นอยู่ใน Spotify")
+            Text("Nothing Playing in Spotify")
         }
         if spotify.automationDenied {
             Divider()
-            Text("⚠︎ MoodPlay ยังไม่ได้รับสิทธิ์ควบคุม Spotify")
-            Button("เปิดการตั้งค่าสิทธิ์…") { model.openAutomationSettings() }
-            Button("ลองอีกครั้ง") { spotify.refresh() }
+            Text("⚠︎ MoodPlay Can’t Access Spotify")
+            Button("Open Permission Settings…") { model.openAutomationSettings() }
+            Button("Try Again") { spotify.refresh() }
         }
         Divider()
-        Picker("ธีม", selection: $model.theme) {
+        Picker("Theme", selection: $model.theme) {
             ForEach(OverlayTheme.allCases) { theme in
                 Text(theme.title).tag(theme)
             }
         }
-        Toggle("แสดงเนื้อเพลง", isOn: $model.showLyrics)
+        Toggle("Show Lyrics", isOn: $model.showLyrics)
         Divider()
-        Button("ล็อกและแสดงตอนนี้  ⌘⇧M") { model.showNow() }
+        Button("Lock & Show Now  ⌘⇧M") { model.showNow() }
         Divider()
-        Toggle("เปิดพร้อมเครื่อง", isOn: Binding(
+        Toggle("Launch at Login", isOn: Binding(
             get: { model.launchAtLogin },
             set: { model.setLaunchAtLogin($0) }
         ))
         Divider()
-        Button("ออกจาก MoodPlay") { NSApp.terminate(nil) }
+        Button("Quit MoodPlay") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
 }
@@ -223,8 +223,8 @@ enum OverlayTheme: String, CaseIterable, Identifiable {
 
     var title: LocalizedStringKey {
         switch self {
-        case .cover: "ปกอัลบั้ม"
-        case .vinyl: "แผ่นเสียง"
+        case .cover: "Album Cover"
+        case .vinyl: "Vinyl"
         }
     }
 

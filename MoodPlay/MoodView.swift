@@ -511,11 +511,11 @@ private struct LyricsPanel: View {
                         .equatable()
                 }
             case .loading:
-                StatusText("กำลังหาเนื้อเพลง…")
+                StatusText("Finding lyrics…")
             case .instrumental:
-                StatusText("เพลงนี้ไม่มีเนื้อร้อง")
+                StatusText("Instrumental")
             case .notFound:
-                StatusText("ไม่พบเนื้อเพลงของเพลงนี้")
+                StatusText("No lyrics found for this song")
             case .idle:
                 EmptyView()
             }
