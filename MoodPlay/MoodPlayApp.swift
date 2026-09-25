@@ -7,7 +7,6 @@
 
 import Combine
 import SwiftUI
-import CoreGraphics
 import Carbon.HIToolbox
 import ServiceManagement
 
@@ -45,13 +44,6 @@ struct MenuContent: View {
             }
         }
         Toggle("แสดงเนื้อเพลง", isOn: $model.showLyrics)
-        Toggle("ล็อกเองเมื่อเครื่องว่าง", isOn: $model.autoShow)
-        Picker("เวลาว่างก่อนล็อก", selection: $model.idleMinutes) {
-            Text("30 วินาที").tag(0.5)
-            Text("1 นาที").tag(1.0)
-            Text("2 นาที").tag(2.0)
-            Text("5 นาที").tag(5.0)
-        }
         Divider()
         Button("ล็อกและแสดงตอนนี้  ⌘⇧M") { model.showNow() }
         Divider()
@@ -71,8 +63,6 @@ struct MenuContent: View {
 final class AppModel: ObservableObject {
     private enum Keys {
         static let showLyrics = "showLyrics"
-        static let autoShow = "autoShow"
-        static let idleMinutes = "idleMinutes"
         static let theme = "theme"
     }
 
@@ -83,18 +73,6 @@ final class AppModel: ObservableObject {
     @Published var showLyrics: Bool {
         didSet { UserDefaults.standard.set(showLyrics, forKey: Keys.showLyrics) }
     }
-    @Published var autoShow: Bool {
-        didSet {
-            UserDefaults.standard.set(autoShow, forKey: Keys.autoShow)
-            scheduleIdleCheck()
-        }
-    }
-    @Published var idleMinutes: Double {
-        didSet {
-            UserDefaults.standard.set(idleMinutes, forKey: Keys.idleMinutes)
-            scheduleIdleCheck()
-        }
-    }
     @Published var theme: OverlayTheme {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: Keys.theme) }
     }
@@ -102,7 +80,6 @@ final class AppModel: ObservableObject {
     /// อ่านจากระบบทุกครั้ง เพราะผู้ใช้ปิดได้เองจาก System Settings → Login Items
     @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
-    private var idleTimer: Timer?
     private var hotKey: GlobalHotKey?
     private var systemObservers: [NSObjectProtocol] = []
     /// หน้าจอล็อกอยู่ / สลับผู้ใช้ไปแล้ว: ห้ามขึ้น overlay ไปแอบกินแบตอยู่หลังหน้าล็อก
@@ -112,13 +89,9 @@ final class AppModel: ObservableObject {
         let defaults = UserDefaults.standard
         defaults.register(defaults: [
             Keys.showLyrics: true,
-            Keys.autoShow: true,
-            Keys.idleMinutes: 2.0,
             Keys.theme: OverlayTheme.cover.rawValue,
         ])
         showLyrics = defaults.bool(forKey: Keys.showLyrics)
-        autoShow = defaults.bool(forKey: Keys.autoShow)
-        idleMinutes = defaults.double(forKey: Keys.idleMinutes)
         theme = OverlayTheme(rawValue: defaults.string(forKey: Keys.theme) ?? "") ?? .cover
 
         overlay.content = { [unowned self] in
@@ -126,27 +99,23 @@ final class AppModel: ObservableObject {
         }
         overlay.onShow = { [weak self] in
             guard let self else { return }
-            idleTimer?.invalidate()
             spotify.setLive(true)
             overlay.setKeepsDisplayAwake(spotify.isPlaying)
         }
         overlay.onHide = { [weak self] in
             self?.spotify.setLive(false)
-            self?.scheduleIdleCheck()
         }
         spotify.onTrackChange = { [weak self] track in
             self?.lyrics.load(for: track)
         }
         spotify.onPlayStateChange = { [weak self] playing in
             self?.overlay.setKeepsDisplayAwake(playing)
-            self?.scheduleIdleCheck()
         }
         spotify.start()
 
         observeSystem()
-        scheduleIdleCheck()
 
-        // ⌘⇧M: ล็อกทันทีตอนลุกจากโต๊ะ ไม่ต้องรอเครื่องว่าง
+        // ⌘⇧M: ล็อกทันทีตอนลุกจากโต๊ะ
         hotKey = GlobalHotKey(keyCode: UInt32(kVK_ANSI_M), modifiers: UInt32(cmdKey | shiftKey)) { [weak self] in
             self?.showNow()
         }
@@ -185,34 +154,6 @@ final class AppModel: ObservableObject {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
             NSWorkspace.shared.open(url)
         }
-    }
-
-    // MARK: - Idle
-
-    /// ไม่ poll ทุกกี่วิ: คำนวณว่าอีกนานแค่ไหนจะว่างครบ แล้วตั้ง timer ปลุกครั้งเดียวตรงนั้น
-    /// ถ้าผู้ใช้ขยับเมาส์ระหว่างนั้น ตอนตื่นมาจะเห็นว่ายังไม่ครบ ก็ตั้งใหม่ตามเวลาที่เหลือ
-    private func scheduleIdleCheck() {
-        idleTimer?.invalidate()
-        idleTimer = nil
-        guard autoShow, spotify.isPlaying, !overlay.isShowing, !isScreenLocked else { return }
-
-        let idle = CGEventSource.secondsSinceLastEventType(
-            .combinedSessionState,
-            eventType: CGEventType(rawValue: ~0)!
-        )
-        let remaining = idleMinutes * 60 - idle
-        if remaining <= 0 {
-            overlay.lockAndShow()
-            return
-        }
-
-        let timer = Timer(timeInterval: max(remaining, 1), repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated { self?.scheduleIdleCheck() }
-        }
-        // ยอมให้ระบบรวบ wake-up กับงานอื่นได้ ช้าไปไม่กี่วิไม่มีใครสังเกต
-        timer.tolerance = min(max(remaining * 0.1, 0.5), 5)
-        RunLoop.main.add(timer, forMode: .common)
-        idleTimer = timer
     }
 
     // MARK: - System
@@ -260,7 +201,6 @@ final class AppModel: ObservableObject {
         } else {
             overlay.hide()
         }
-        scheduleIdleCheck()
     }
 
     /// บนหน้าล็อก: แสดงหน้าจอเพลงเฉพาะเมื่อมีเพลงอยู่

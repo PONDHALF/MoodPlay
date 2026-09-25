@@ -10,13 +10,22 @@ import SwiftUI
 // หลักการด้าน performance ของไฟล์นี้
 // - view หลักไม่ observe เวลาเพลง: มีแค่ view ปลายทาง (แถบเวลา/เนื้อเพลง) ที่คำนวณเวลาเอง
 // - เนื้อเพลงและแถบเวลาใช้ TimelineView ที่ปลุกเฉพาะตอนที่ต้องเปลี่ยนจริง ไม่ tick ถี่ ๆ
-// - อะไรที่ขยับตลอด (พื้นหลังลอย, แผ่นหมุน) ใช้ Core Animation ซึ่งวิ่งใน render server ไม่กิน CPU แอป
+// - อะไรที่ขยับตลอด (แผ่นหมุน) ใช้ Core Animation ซึ่งวิ่งใน render server ไม่กิน CPU แอป
 
 struct MoodView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var spotify: SpotifyMonitor
     let clock: PlaybackClock
-    let lyrics: LyricsStore
+    @ObservedObject var lyrics: LyricsStore
+
+    /// มีเนื้อเพลงให้แสดงจริงไหม ถ้าไม่มี (ปิดไว้ / หาไม่เจอ / เพลงบรรเลง / กำลังโหลด) ให้จัดทุกอย่างไว้กลางจอ
+    private var showsLyricsColumn: Bool {
+        guard model.showLyrics else { return false }
+        switch lyrics.state {
+        case .synced, .plain: return true
+        case .idle, .loading, .notFound, .instrumental: return false
+        }
+    }
 
     /// ปกตรงกับเพลงปัจจุบันหรือยัง (ระหว่างโหลดปกใหม่ พื้นหลังยังใช้ปกเก่าได้ แต่ปกด้านหน้าไม่ควร)
     private var currentCover: CGImage? {
@@ -29,27 +38,13 @@ struct MoodView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // สีจากปกเรืองที่ขอบซ้าย/ขวา กลางจอโปร่งให้เห็นนาฬิกาและช่องปลดล็อกของระบบ
-                AmbientBackground(image: spotify.artwork?.ambient)
-
-                // เงาเข้มที่ขอบให้อ่านตัวหนังสือออกบนทุก wallpaper
-                LinearGradient(
-                    stops: [
-                        .init(color: .black.opacity(0.55), location: 0),
-                        .init(color: .clear, location: 0.4),
-                        .init(color: .clear, location: 0.6),
-                        .init(color: .black.opacity(0.55), location: 1),
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-
+                // วางบน wallpaper ของหน้าล็อกตรง ๆ ไม่มีพื้นหลังหรือเงาทับ ให้กลืนไปกับระบบ
                 if let track = spotify.track {
                     layout(track: track, size: geo.size)
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.6), value: model.showLyrics)
+            .animation(.easeInOut(duration: 0.6), value: showsLyricsColumn)
             .animation(.easeInOut(duration: 0.6), value: model.theme)
             .animation(.easeInOut(duration: 0.6), value: spotify.track == nil)
         }
@@ -58,110 +53,69 @@ struct MoodView: View {
         .ignoresSafeArea()
     }
 
-    /// ปกอยู่ซ้าย เนื้อเพลงอยู่ขวา กลางจอว่างไว้ให้ระบบ
+    /// แถบกลางจอระหว่างนาฬิกา (บน) กับช่องรหัสผ่าน/Touch ID (ล่าง) ของระบบ
+    private static let bandTop = 0.26
+    private static let bandBottom = 0.24
+
+    /// มีเนื้อเพลง: ปกซ้าย เนื้อเพลงขวา กว้างเท่ากัน เว้นขอบเท่ากัน
+    /// ไม่มีเนื้อเพลง: ปก ชื่อเพลง ศิลปิน แถบเวลา อยู่กลางจอ
+    /// ทั้งสองแบบอยู่กึ่งกลางแถบระหว่างนาฬิกากับช่องปลดล็อก
     private func layout(track: Track, size: CGSize) -> some View {
-        let cover = min(size.height * 0.3, 320)
-        let side = size.width * 0.3
-        return HStack(alignment: .center, spacing: 0) {
-            NowPlayingColumn(
-                track: track,
-                theme: model.theme,
-                cover: currentCover,
-                coverKey: coverKey,
-                coverSize: cover,
-                isPlaying: spotify.isPlaying,
-                clock: clock
-            )
-            .frame(width: side, alignment: .leading)
+        let bandHeight = size.height * (1 - Self.bandTop - Self.bandBottom)
+        // ขนาดตัวอักษรปรับตามความสูงจอ (อ้างอิง MacBook Pro 14" สูง 982pt)
+        let textScale = min(max(size.height / 982, 0.85), 1.25)
 
-            Spacer(minLength: 0)
+        return Group {
+            if showsLyricsColumn {
+                // สองฝั่งกว้างเท่ากันและห่างจากกลางจอเท่ากัน ให้สมดุลกับนาฬิกา/ช่องปลดล็อกตรงกลาง
+                let side = size.width * 0.26
+                // ปก + ชื่อเพลง + ศิลปิน + แถบเวลา ต้องพอดีในแถบ และแผ่นเสียง+แขนเข็มต้องไม่เกินความกว้างฝั่ง
+                let cover = min(bandHeight * 0.5, side / OverlayTheme.vinyl.artWidthRatio)
+                HStack(alignment: .center, spacing: 0) {
+                    nowPlaying(track: track, coverSize: cover, contentWidth: side, textScale: textScale, alignment: .leading)
+                        .frame(width: side, alignment: .leading)
 
-            if model.showLyrics {
-                LyricsPanel(lyrics: lyrics, clock: clock)
-                    .frame(width: side)
-                    .frame(maxHeight: size.height * 0.6)
+                    Spacer(minLength: 0)
+
+                    LyricsPanel(lyrics: lyrics, clock: clock, textScale: textScale)
+                        .frame(width: side, height: bandHeight)
+                }
+                .padding(.horizontal, size.width * 0.08)
+            } else {
+                let width = size.width * 0.3
+                let cover = min(bandHeight * 0.52, width / OverlayTheme.vinyl.artWidthRatio)
+                nowPlaying(track: track, coverSize: cover, contentWidth: width, textScale: textScale, alignment: .center)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, size.width * 0.05)
+        .frame(height: bandHeight)
+        .padding(.top, size.height * Self.bandTop)
+        .padding(.bottom, size.height * Self.bandBottom)
+        // เงาจาง ๆ ใต้ตัวหนังสือ ให้อ่านออกบนทุก wallpaper แบบเดียวกับนาฬิกาของระบบ
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 1)
     }
 }
 
-// MARK: - Background
-
-/// พื้นหลังจากปกเบลอ: ภาพจิ๋ว 32px ที่เบลอไว้แล้ว ขยายเต็มจอ + ลอยช้า ๆ ด้วย Core Animation
-private struct AmbientBackground: NSViewRepresentable {
-    let image: CGImage?
-
-    func makeNSView(context: Context) -> AmbientLayerView { AmbientLayerView() }
-
-    func updateNSView(_ view: AmbientLayerView, context: Context) {
-        view.setImage(image)
-    }
-}
-
-final class AmbientLayerView: NSView {
-    private let imageLayer = CALayer()
-    private let edgeMask = CAGradientLayer()
-    private var currentImage: CGImage?
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        let root = CALayer()
-        root.masksToBounds = true
-        layer = root
-        wantsLayer = true
-
-        imageLayer.contentsGravity = .resizeAspectFill
-        imageLayer.magnificationFilter = .linear
-        imageLayer.opacity = 0.65
-        imageLayer.actions = ["bounds": NSNull(), "position": NSNull(), "contents": NSNull()]
-        root.addSublayer(imageLayer)
-
-        // ทึบที่ขอบ โปร่งกลางจอ
-        let opaque = NSColor.black.cgColor
-        let clear = NSColor.clear.cgColor
-        edgeMask.colors = [opaque, clear, clear, opaque]
-        edgeMask.locations = [0, 0.38, 0.62, 1]
-        edgeMask.startPoint = CGPoint(x: 0, y: 0.5)
-        edgeMask.endPoint = CGPoint(x: 1, y: 0.5)
-        edgeMask.actions = ["bounds": NSNull(), "position": NSNull()]
-        root.mask = edgeMask
-
-        let scale = CABasicAnimation(keyPath: "transform.scale")
-        scale.fromValue = 1.2
-        scale.toValue = 1.4
-        let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
-        rotation.fromValue = -6 * Double.pi / 180
-        rotation.toValue = 6 * Double.pi / 180
-        let drift = CAAnimationGroup()
-        drift.animations = [scale, rotation]
-        drift.duration = 9
-        drift.autoreverses = true
-        drift.repeatCount = .infinity
-        drift.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        drift.isRemovedOnCompletion = false
-        imageLayer.add(drift, forKey: "drift")
-    }
-
-    required init?(coder: NSCoder) { nil }
-
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    override func layout() {
-        super.layout()
-        imageLayer.bounds = bounds
-        imageLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
-        edgeMask.frame = bounds
-    }
-
-    func setImage(_ image: CGImage?) {
-        guard image !== currentImage else { return }
-        currentImage = image
-        let fade = CATransition()
-        fade.type = .fade
-        fade.duration = 1.2
-        imageLayer.add(fade, forKey: "crossfade")
-        imageLayer.contents = image
+extension MoodView {
+    fileprivate func nowPlaying(
+        track: Track,
+        coverSize: CGFloat,
+        contentWidth: CGFloat,
+        textScale: CGFloat,
+        alignment: HorizontalAlignment
+    ) -> some View {
+        NowPlayingColumn(
+            track: track,
+            theme: model.theme,
+            cover: currentCover,
+            coverKey: coverKey,
+            coverSize: coverSize,
+            contentWidth: contentWidth,
+            textScale: textScale,
+            alignment: alignment,
+            isPlaying: spotify.isPlaying,
+            clock: clock
+        )
     }
 }
 
@@ -173,43 +127,55 @@ private struct NowPlayingColumn: View {
     let cover: CGImage?
     let coverKey: String
     let coverSize: CGFloat
+    /// ความกว้างของทั้งคอลัมน์ ชื่อเพลงและแถบเวลายาวเต็มคอลัมน์ ให้ฝั่งซ้ายหนักเท่าฝั่งเนื้อเพลง
+    let contentWidth: CGFloat
+    let textScale: CGFloat
+    let alignment: HorizontalAlignment
     let isPlaying: Bool
     let clock: PlaybackClock
 
+    private var isCentered: Bool { alignment == .center }
+    private var frameAlignment: Alignment { isCentered ? .center : .leading }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: alignment, spacing: 0) {
             Group {
                 switch theme {
                 case .cover:
                     CoverArt(image: cover, key: coverKey, size: coverSize)
                 case .vinyl:
+                    // ชดเชยแขนเข็มที่ยื่นไปทางขวา ให้ตัวแผ่นอยู่กลางจอพอดีตอนจัดกึ่งกลาง
                     VinylPlayer(cover: cover, size: coverSize, isPlaying: isPlaying)
+                        .padding(.leading, isCentered ? coverSize * (OverlayTheme.vinyl.artWidthRatio - 1) : 0)
                 }
             }
-            .padding(.bottom, 40)
+            .padding(.bottom, 28 * textScale)
 
+            // ชื่อเพลงเด่นที่สุดในฝั่งเรา แต่ยังเล็กกว่านาฬิกาของระบบ
             Text(track.name)
-                .font(.system(size: 40, weight: .bold))
-                .tracking(-0.8)
-                .multilineTextAlignment(.leading)
+                .font(.system(size: 34 * textScale, weight: .bold))
+                .tracking(-0.6)
+                .multilineTextAlignment(isCentered ? .center : .leading)
                 .lineLimit(2)
                 .minimumScaleFactor(0.6)
-                .padding(.bottom, 8)
+                .frame(width: contentWidth, alignment: frameAlignment)
+                .padding(.bottom, 6 * textScale)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 if !isPlaying {
                     Image(systemName: "pause.fill")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 12 * textScale, weight: .bold))
                 }
                 Text(track.artist)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 18 * textScale, weight: .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(.white.opacity(0.6))
-            .padding(.bottom, 32)
+            .frame(width: contentWidth, alignment: frameAlignment)
+            .foregroundStyle(.white.opacity(0.7))
+            .padding(.bottom, 22 * textScale)
 
             ProgressLine(clock: clock)
-                .frame(width: coverSize)
+                .frame(width: contentWidth)
         }
     }
 }
@@ -237,7 +203,8 @@ private struct CoverArt: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .shadow(color: .black.opacity(0.6), radius: 50, y: 30)
+        // เงาเบา ๆ ไม่ให้เป็นคราบดำบน wallpaper สีอ่อน
+        .shadow(color: .black.opacity(0.3), radius: 24, y: 12)
         .animation(.easeInOut(duration: 0.8), value: key)
     }
 }
@@ -439,6 +406,9 @@ final class DiscLayerView: NSView {
 }
 
 nonisolated enum DiscRenderer {
+    /// รัศมีปกกลางแผ่นเทียบกับความกว้างแผ่น (0.32 = ปกกว้าง 64%) ยังเหลือวงร่องพอให้ดูเป็นแผ่นเสียง
+    static let labelRadius: CGFloat = 0.32
+
     static func render(cover: CGImage?, pixels n: Int) -> CGImage? {
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
@@ -457,7 +427,7 @@ nonisolated enum DiscRenderer {
 
         // ร่องแผ่น: จากขอบ label ออกไปจนเกือบถึงขอบแผ่น
         context.setLineWidth(max(size / 700, 0.5))
-        var fraction: CGFloat = 0.215
+        var fraction: CGFloat = labelRadius + 0.01
         var index = 0
         while fraction < 0.485 {
             let alpha: CGFloat = index % 5 == 0 ? 0.09 : 0.035
@@ -468,7 +438,7 @@ nonisolated enum DiscRenderer {
         }
 
         // label กลางแผ่นเป็นปกเพลง
-        let label = circle(size * 0.2)
+        let label = circle(size * Self.labelRadius)
         context.saveGState()
         context.addEllipse(in: label)
         context.clip()
@@ -520,6 +490,7 @@ private struct ToneArm: View {
 private struct LyricsPanel: View {
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var clock: PlaybackClock
+    let textScale: CGFloat
 
     /// เลื่อนเร็วขึ้นเล็กน้อยให้บรรทัดขึ้นทันเสียง
     private static let syncedLead = 0.25
@@ -529,14 +500,14 @@ private struct LyricsPanel: View {
             switch lyrics.state {
             case .synced(let lines):
                 BoundaryTimeline(times: lines.map(\.time), anchor: clock.anchor, lead: Self.syncedLead) { index in
-                    SyncedLyrics(lines: lines, current: index)
+                    SyncedLyrics(lines: lines, fontSize: 28 * textScale, current: index)
                         .equatable()
                 }
             case .plain(let lines):
                 // ไม่มี timestamp จึงเลื่อนตามสัดส่วนเวลาของเพลงแทน
                 let step = clock.anchor.duration / Double(max(lines.count, 1))
                 BoundaryTimeline(times: lines.indices.map { Double($0) * step }, anchor: clock.anchor, lead: 0) { index in
-                    PlainLyrics(lines: lines, anchor: max(index, 0))
+                    PlainLyrics(lines: lines, fontSize: 24 * textScale, anchor: max(index, 0))
                         .equatable()
                 }
             case .loading:
@@ -619,6 +590,8 @@ private struct StatusText: View {
 /// Equatable: SwiftUI จะข้ามการ render ถ้าบรรทัดปัจจุบันยังเป็นบรรทัดเดิม
 private struct SyncedLyrics: View, Equatable {
     let lines: [LyricLine]
+    /// เล็กกว่าชื่อเพลง ไม่แย่งความเด่นจากนาฬิกาของระบบ
+    let fontSize: CGFloat
     /// -1 = ยังไม่ถึงบรรทัดแรก
     let current: Int
 
@@ -627,7 +600,7 @@ private struct SyncedLyrics: View, Equatable {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     // Lazy: สร้างเฉพาะบรรทัดที่อยู่ในจอ บรรทัดที่พ้นจอไปไม่ถูก render/เบลอ
-                    LazyVStack(alignment: .leading, spacing: 26) {
+                    LazyVStack(alignment: .leading, spacing: fontSize * 0.7) {
                         Color.clear.frame(height: geo.size.height / 2)
                         ForEach(lines) { line in
                             lineView(line)
@@ -662,7 +635,7 @@ private struct SyncedLyrics: View, Equatable {
                 BreakDots(active: isCurrent)
             } else {
                 Text(verbatim: line.text)
-                    .font(.system(size: 36, weight: .bold))
+                    .font(.system(size: fontSize, weight: .bold))
                     .tracking(-0.5)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -697,17 +670,18 @@ private struct BreakDots: View {
 
 private struct PlainLyrics: View, Equatable {
     let lines: [String]
+    let fontSize: CGFloat
     let anchor: Int
 
     var body: some View {
         GeometryReader { geo in
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(alignment: .leading, spacing: 18) {
+                    LazyVStack(alignment: .leading, spacing: fontSize * 0.65) {
                         Color.clear.frame(height: geo.size.height / 2)
                         ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                             Text(verbatim: line)
-                                .font(.system(size: 28, weight: .bold))
+                                .font(.system(size: fontSize, weight: .bold))
                                 .tracking(-0.3)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)

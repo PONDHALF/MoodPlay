@@ -36,11 +36,10 @@ nonisolated struct PlaybackAnchor: Equatable, Sendable {
     }
 }
 
-/// ปกที่ย่อขนาดแล้ว + พื้นหลังจิ๋วที่เบลอไว้ล่วงหน้า
+/// ปกที่ย่อขนาดแล้ว
 nonisolated struct Artwork: @unchecked Sendable {
     let trackID: String
     let cover: CGImage
-    let ambient: CGImage
 }
 
 /// สถานะของ Spotify ณ ขณะหนึ่ง อ่านได้ทั้งจาก distributed notification และ AppleScript
@@ -347,9 +346,8 @@ final class SpotifyMonitor: ObservableObject {
 
 nonisolated enum ArtworkLoader {
     private static let coverPixels = 640
-    private static let ambientPixels = 32
 
-    /// โหลด + ย่อขนาด + ทำพื้นหลัง บน background thread
+    /// โหลด + ย่อขนาด บน background thread
     @concurrent
     static func load(_ url: URL, trackID: String) async -> Artwork? {
         guard let (data, _) = try? await HTTP.session.data(from: url),
@@ -361,58 +359,7 @@ nonisolated enum ArtworkLoader {
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: coverPixels,
         ]
-        guard let cover = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
-              let ambient = makeAmbient(from: cover)
-        else { return nil }
-        return Artwork(trackID: trackID, cover: cover, ambient: ambient)
-    }
-
-    /// ย่อปกเหลือ 32px แล้วเบลอ + เพิ่มความสด ครั้งเดียว
-    /// พอขยายเต็มจอแบบ bilinear จะได้ภาพนุ่มเหมือนเบลอหนัก ๆ โดยไม่ต้องเบลอสดทุกเฟรม
-    private static func makeAmbient(from image: CGImage) -> CGImage? {
-        let n = ambientPixels
-        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(
-                data: nil, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
-                space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-              ),
-              let raw = context.data
-        else { return nil }
-        context.interpolationQuality = .high
-        context.draw(image, in: CGRect(x: 0, y: 0, width: n, height: n))
-
-        let pixels = raw.bindMemory(to: UInt8.self, capacity: n * n * 4)
-        let saturation = 1.35
-        for i in 0..<(n * n) {
-            let o = i * 4
-            let r = Double(pixels[o]), g = Double(pixels[o + 1]), b = Double(pixels[o + 2])
-            let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            pixels[o] = UInt8(clamping: Int((luma + (r - luma) * saturation).rounded()))
-            pixels[o + 1] = UInt8(clamping: Int((luma + (g - luma) * saturation).rounded()))
-            pixels[o + 2] = UInt8(clamping: Int((luma + (b - luma) * saturation).rounded()))
-        }
-        for _ in 0..<3 { boxBlur(pixels, size: n) }
-        return context.makeImage()
-    }
-
-    private static func boxBlur(_ pixels: UnsafeMutablePointer<UInt8>, size n: Int) {
-        let copy = [UInt8](UnsafeBufferPointer(start: pixels, count: n * n * 4))
-        for y in 0..<n {
-            for x in 0..<n {
-                var r = 0, g = 0, b = 0
-                for dy in -1...1 {
-                    for dx in -1...1 {
-                        let sx = min(max(x + dx, 0), n - 1)
-                        let sy = min(max(y + dy, 0), n - 1)
-                        let o = (sy * n + sx) * 4
-                        r += Int(copy[o]); g += Int(copy[o + 1]); b += Int(copy[o + 2])
-                    }
-                }
-                let o = (y * n + x) * 4
-                pixels[o] = UInt8(r / 9)
-                pixels[o + 1] = UInt8(g / 9)
-                pixels[o + 2] = UInt8(b / 9)
-            }
-        }
+        guard let cover = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return Artwork(trackID: trackID, cover: cover)
     }
 }
