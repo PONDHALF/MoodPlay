@@ -12,6 +12,7 @@ When you step away from your desk, MoodPlay fades in an ambient view of the song
 ![Swift](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)
 ![Spotify](https://img.shields.io/badge/works%20with-Spotify%20desktop-1DB954?logo=spotify&logoColor=white)
+[![Release](https://img.shields.io/github/v/release/PONDHALF/MoodPlay?label=download&color=8E5CFF)](https://github.com/PONDHALF/MoodPlay/releases/latest)
 
 </div>
 
@@ -57,13 +58,45 @@ When you step away from your desk, MoodPlay fades in an ambient view of the song
 
 - **macOS 14 Sonoma** or later
 - **Spotify desktop app** (the web player isn't supported)
-- **Xcode 26** or later to build from source (Swift 6.2)
+- **Xcode 26** or later, only if you build from source (Swift 6.2)
 
 ---
 
 ## Installation
 
-MoodPlay is currently distributed as source code.
+### Option 1: Download the installer (recommended)
+
+1. Go to the [**latest release**](https://github.com/PONDHALF/MoodPlay/releases/latest) and download **`MoodPlay-x.y.z.dmg`**.
+2. Open the DMG and drag **MoodPlay** into **Applications**.
+3. Open MoodPlay from **Applications**. A waveform icon appears in the menu bar.
+4. In the MoodPlay menu, turn on **Launch at login** if you want it to start with your Mac.
+
+The app is a universal build, so it runs natively on both Apple Silicon and Intel Macs.
+
+#### "Apple could not verify MoodPlay…" on first open
+
+MoodPlay is open source and isn't signed with a paid Apple Developer ID, so macOS shows this warning the first time you open it. To open it anyway:
+
+1. Try to open MoodPlay once, then click **Done** in the warning.
+2. Go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to the MoodPlay message.
+3. Confirm with **Open Anyway** and your password or Touch ID.
+
+You only need to do this once. If you prefer Terminal, this command does the same thing:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/MoodPlay.app
+```
+
+> 🔐 Want to check the download? Every release includes a `.sha256` file:
+> ```bash
+> shasum -a 256 -c MoodPlay-x.y.z.dmg.sha256
+> ```
+
+#### Updating
+
+Quit MoodPlay from its menu, download the new DMG, and replace the app in **Applications**. Because each build has its own ad-hoc signature, macOS may ask for the Spotify permission again after an update. Click **OK**.
+
+### Option 2: Build from source
 
 ```bash
 git clone https://github.com/PONDHALF/MoodPlay.git
@@ -73,16 +106,22 @@ open MoodPlay.xcodeproj
 
 1. In Xcode, select the **MoodPlay** target → **Signing & Capabilities** → choose your **Team**.
    A free Apple ID works for personal use.
-2. Press **⌘R** to build and run. A waveform icon appears in the menu bar.
+2. Press **⌘R** to build and run.
 
-### Install it permanently (recommended)
+### Building the installer yourself
 
-Running from Xcode puts the app in a temporary build folder. To use MoodPlay every day:
+To produce the same universal DMG that's published on the Releases page:
 
-1. In Xcode choose **Product → Archive**.
-2. In the Organizer, click **Distribute App → Copy App** and save it.
-3. Move **MoodPlay.app** into your **Applications** folder and open it from there.
-4. In the MoodPlay menu, turn on **Launch at login**.
+```bash
+./scripts/build-release.sh
+# → build/MoodPlay-<version>.dmg and build/MoodPlay-<version>.dmg.sha256
+```
+
+The build is ad-hoc signed by default. If you have a Developer ID certificate, pass it to create a build you can notarize:
+
+```bash
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/build-release.sh
+```
 
 ---
 
@@ -216,6 +255,12 @@ MoodPlay is built to be close to free when you're not looking at it.
 </details>
 
 <details>
+<summary><b>macOS says MoodPlay "can't be opened" or "could not be verified"</b></summary>
+
+This is expected for apps without a paid Developer ID. See [first open instructions](#apple-could-not-verify-moodplay-on-first-open).
+</details>
+
+<details>
 <summary><b>The overlay never appears on its own</b></summary>
 
 - **Show automatically when idle** must be on, and music must be **playing** (not paused).
@@ -274,6 +319,8 @@ MoodPlay/
 ├── MoodView.swift           # Overlay UI: background, cover / vinyl, progress, clock, lyrics
 ├── MoodPlay.entitlements    # Apple Events automation entitlement
 └── plan.md                  # Original design plan (Thai)
+scripts/
+└── build-release.sh         # Universal build + DMG installer
 ```
 
 ---
