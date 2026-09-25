@@ -107,6 +107,8 @@ final class SpotifyMonitor: ObservableObject {
     @Published private(set) var track: Track?
     @Published private(set) var isPlaying = false
     @Published private(set) var artwork: Artwork?
+    /// ผู้ใช้กดปฏิเสธสิทธิ์ Automation (MoodPlay → Spotify) ไว้
+    @Published private(set) var automationDenied = false
 
     let clock = PlaybackClock()
 
@@ -213,7 +215,7 @@ final class SpotifyMonitor: ObservableObject {
             if track != nil || isPlaying { reset() }
             return
         }
-        guard let output = Self.runAppleScript(Self.stateScript) else { return }
+        guard let output = runAppleScript(Self.stateScript) else { return }
         apply(SpotifySnapshot(appleScriptOutput: output))
     }
 
@@ -221,7 +223,7 @@ final class SpotifyMonitor: ObservableObject {
 
     private func syncPosition() {
         guard track != nil, isSpotifyRunning,
-              let output = Self.runAppleScript(Self.syncScript)
+              let output = runAppleScript(Self.syncScript)
         else { return }
         let parts = output.components(separatedBy: SpotifySnapshot.separator)
         guard parts.count == 2, let position = SpotifySnapshot.parseNumber(parts[1]) else { return }
@@ -286,7 +288,7 @@ final class SpotifyMonitor: ObservableObject {
     private func loadArtworkIfNeeded() {
         guard let track, artwork?.trackID != track.id, isSpotifyRunning else { return }
         artworkTask?.cancel()
-        guard let output = Self.runAppleScript(Self.artworkScript),
+        guard let output = runAppleScript(Self.artworkScript),
               let url = URL(string: output.trimmingCharacters(in: .whitespacesAndNewlines)),
               url.scheme?.hasPrefix("http") == true
         else {
@@ -303,15 +305,29 @@ final class SpotifyMonitor: ObservableObject {
 
     // MARK: - AppleScript
 
+    /// -1743 = ผู้ใช้ปฏิเสธสิทธิ์, -1744 = ยังไม่เคยถาม แต่ห้ามถามในบริบทนี้
+    private static let permissionErrors: Set<Int> = [-1743, -1744]
+
+    private func runAppleScript(_ source: String) -> String? {
+        let (output, errorCode) = Self.executeAppleScript(source)
+        let denied = errorCode.map(Self.permissionErrors.contains) ?? false
+        if denied != automationDenied, output != nil || denied {
+            automationDenied = denied
+        }
+        return output
+    }
+
     /// compile ครั้งเดียวแล้วเก็บไว้ใช้ซ้ำ
-    private static func runAppleScript(_ source: String) -> String? {
+    private static func executeAppleScript(_ source: String) -> (output: String?, errorCode: Int?) {
         let script: NSAppleScript
         if let cached = compiledScripts[source] {
             script = cached
         } else {
-            guard let created = NSAppleScript(source: source) else { return nil }
+            guard let created = NSAppleScript(source: source) else { return (nil, nil) }
             var compileError: NSDictionary?
-            guard created.compileAndReturnError(&compileError) else { return nil }
+            guard created.compileAndReturnError(&compileError) else {
+                return (nil, compileError?[NSAppleScript.errorNumber] as? Int)
+            }
             compiledScripts[source] = created
             script = created
         }
@@ -321,9 +337,9 @@ final class SpotifyMonitor: ObservableObject {
             #if DEBUG
             print("[SpotifyMonitor] AppleScript error:", error)
             #endif
-            return nil
+            return (nil, error[NSAppleScript.errorNumber] as? Int)
         }
-        return result.stringValue
+        return (result.stringValue, nil)
     }
 }
 

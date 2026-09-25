@@ -9,6 +9,7 @@ import Combine
 import SwiftUI
 import CoreGraphics
 import Carbon.HIToolbox
+import ServiceManagement
 
 @main
 struct MoodPlayApp: App {
@@ -31,6 +32,12 @@ struct MenuContent: View {
         } else {
             Text("ไม่มีเพลงที่เล่นอยู่ใน Spotify")
         }
+        if spotify.automationDenied {
+            Divider()
+            Text("⚠︎ MoodPlay ยังไม่ได้รับสิทธิ์ควบคุม Spotify")
+            Button("เปิดการตั้งค่าสิทธิ์…") { model.openAutomationSettings() }
+            Button("ลองอีกครั้ง") { spotify.refresh() }
+        }
         Divider()
         Picker("ธีม", selection: $model.theme) {
             ForEach(OverlayTheme.allCases) { theme in
@@ -47,6 +54,11 @@ struct MenuContent: View {
         }
         Divider()
         Button("แสดงตอนนี้  ⌘⇧M") { model.showNow() }
+        Divider()
+        Toggle("เปิดพร้อมเครื่อง", isOn: Binding(
+            get: { model.launchAtLogin },
+            set: { model.setLaunchAtLogin($0) }
+        ))
         Divider()
         Button("ออกจาก MoodPlay") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
@@ -86,6 +98,9 @@ final class AppModel: ObservableObject {
     @Published var theme: OverlayTheme {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: Keys.theme) }
     }
+
+    /// อ่านจากระบบทุกครั้ง เพราะผู้ใช้ปิดได้เองจาก System Settings → Login Items
+    @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     private var idleTimer: Timer?
     private var hotKey: GlobalHotKey?
@@ -140,6 +155,32 @@ final class AppModel: ObservableObject {
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
             self?.overlay.show()
+        }
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        let service = SMAppService.mainApp
+        do {
+            if enabled {
+                try service.register()
+            } else {
+                try service.unregister()
+            }
+        } catch {
+            #if DEBUG
+            print("[AppModel] launch at login:", error)
+            #endif
+        }
+        // ถ้าระบบต้องให้ผู้ใช้อนุมัติก่อน พาไปหน้า Login Items เลย
+        if service.status == .requiresApproval {
+            SMAppService.openSystemSettingsLoginItems()
+        }
+        launchAtLogin = service.status == .enabled
+    }
+
+    func openAutomationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+            NSWorkspace.shared.open(url)
         }
     }
 
