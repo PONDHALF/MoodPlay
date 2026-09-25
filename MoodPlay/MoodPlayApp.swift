@@ -44,7 +44,7 @@ struct MenuContent: View {
         }
         Toggle("Show Lyrics", isOn: $model.showLyrics)
         Divider()
-        Toggle("Launch at Login", isOn: Binding(
+        Toggle("Open at Startup", isOn: Binding(
             get: { model.launchAtLogin },
             set: { model.setLaunchAtLogin($0) }
         ))

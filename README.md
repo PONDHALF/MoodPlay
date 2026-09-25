@@ -71,7 +71,7 @@ Whenever your Mac is locked, MoodPlay shows the song you're playing right on the
 1. Go to the [**latest release**](https://github.com/PONDHALF/MoodPlay/releases/latest) and download **`MoodPlay-x.y.z.dmg`**.
 2. Open the DMG and drag **MoodPlay** into **Applications**.
 3. Open MoodPlay from **Applications**. A waveform icon appears in the menu bar.
-4. In the MoodPlay menu, turn on **Launch at Login** if you want it to start with your Mac.
+4. In the MoodPlay menu, turn on **Open at Startup** if you want it to start with your Mac.
 
 The app is a universal build, so it runs natively on both Apple Silicon and Intel Macs.
 
@@ -167,7 +167,7 @@ Click the **waveform** icon in the menu bar:
 | *Now Playing* | The current track and whether it's playing or paused. |
 | **Theme** | **Album Cover** or **Vinyl**. |
 | **Show Lyrics** | On: artwork on the left, lyrics on the right. Off: artwork and track details centered. |
-| **Launch at Login** | Start MoodPlay when you log in. |
+| **Open at Startup** | Open MoodPlay automatically when your Mac starts. |
 | **Quit MoodPlay** | ⌘Q |
 
 ---
