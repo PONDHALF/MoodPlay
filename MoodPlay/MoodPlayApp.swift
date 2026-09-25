@@ -45,15 +45,15 @@ struct MenuContent: View {
             }
         }
         Toggle("แสดงเนื้อเพลง", isOn: $model.showLyrics)
-        Toggle("เปิดเองอัตโนมัติ", isOn: $model.autoShow)
-        Picker("เวลาว่างก่อนเปิด", selection: $model.idleMinutes) {
+        Toggle("ล็อกเองเมื่อเครื่องว่าง", isOn: $model.autoShow)
+        Picker("เวลาว่างก่อนล็อก", selection: $model.idleMinutes) {
             Text("30 วินาที").tag(0.5)
             Text("1 นาที").tag(1.0)
             Text("2 นาที").tag(2.0)
             Text("5 นาที").tag(5.0)
         }
         Divider()
-        Button("แสดงตอนนี้  ⌘⇧M") { model.showNow() }
+        Button("ล็อกและแสดงตอนนี้  ⌘⇧M") { model.showNow() }
         Divider()
         Toggle("เปิดพร้อมเครื่อง", isOn: Binding(
             get: { model.launchAtLogin },
@@ -125,8 +125,10 @@ final class AppModel: ObservableObject {
             AnyView(MoodView(model: self, spotify: spotify, clock: spotify.clock, lyrics: lyrics))
         }
         overlay.onShow = { [weak self] in
-            self?.idleTimer?.invalidate()
-            self?.spotify.setLive(true)
+            guard let self else { return }
+            idleTimer?.invalidate()
+            spotify.setLive(true)
+            overlay.setKeepsDisplayAwake(spotify.isPlaying)
         }
         overlay.onHide = { [weak self] in
             self?.spotify.setLive(false)
@@ -135,7 +137,8 @@ final class AppModel: ObservableObject {
         spotify.onTrackChange = { [weak self] track in
             self?.lyrics.load(for: track)
         }
-        spotify.onPlayStateChange = { [weak self] _ in
+        spotify.onPlayStateChange = { [weak self] playing in
+            self?.overlay.setKeepsDisplayAwake(playing)
             self?.scheduleIdleCheck()
         }
         spotify.start()
@@ -143,7 +146,7 @@ final class AppModel: ObservableObject {
         observeSystem()
         scheduleIdleCheck()
 
-        // ⌘⇧M: เปิดทันทีตอนลุกจากโต๊ะ ไม่ต้องรอเครื่องว่าง
+        // ⌘⇧M: ล็อกทันทีตอนลุกจากโต๊ะ ไม่ต้องรอเครื่องว่าง
         hotKey = GlobalHotKey(keyCode: UInt32(kVK_ANSI_M), modifiers: UInt32(cmdKey | shiftKey)) { [weak self] in
             self?.showNow()
         }
@@ -151,10 +154,10 @@ final class AppModel: ObservableObject {
 
     func showNow() {
         guard !isScreenLocked else { return }
-        // ให้เมนูปิดให้เรียบร้อยก่อนค่อยขึ้น overlay
+        // ให้เมนูปิดให้เรียบร้อยก่อนค่อยล็อก
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
-            self?.overlay.show()
+            self?.overlay.lockAndShow()
         }
     }
 
@@ -199,7 +202,7 @@ final class AppModel: ObservableObject {
         )
         let remaining = idleMinutes * 60 - idle
         if remaining <= 0 {
-            overlay.show()
+            overlay.lockAndShow()
             return
         }
 
@@ -224,7 +227,12 @@ final class AppModel: ObservableObject {
         // จอดับ = ไม่มีใครเห็น ปิดทิ้งเพื่อหยุด animation ทั้งหมด
         observe(workspace, NSWorkspace.screensDidSleepNotification.rawValue) { $0.overlay.hide() }
         observe(workspace, NSWorkspace.willSleepNotification.rawValue) { $0.overlay.hide() }
-        observe(workspace, NSWorkspace.sessionDidResignActiveNotification.rawValue) { $0.setScreenLocked(true) }
+        // จอติดกลับมาขณะยังล็อกอยู่ (เช่นกดคีย์เพื่อจะปลดล็อก) → ขึ้นหน้าจอเพลงบนหน้าล็อกอีกครั้ง
+        observe(workspace, NSWorkspace.screensDidWakeNotification.rawValue) { model in
+            if model.isScreenLocked { model.updateLockScreenOverlay() }
+        }
+        // สลับผู้ใช้: session เราไม่ได้อยู่หน้าจอแล้ว ไม่ต้องแสดงอะไร
+        observe(workspace, NSWorkspace.sessionDidResignActiveNotification.rawValue) { $0.setScreenLocked(true, showMood: false) }
         observe(workspace, NSWorkspace.sessionDidBecomeActiveNotification.rawValue) { $0.setScreenLocked(false) }
     }
 
@@ -245,10 +253,23 @@ final class AppModel: ObservableObject {
         })
     }
 
-    private func setScreenLocked(_ locked: Bool) {
+    private func setScreenLocked(_ locked: Bool, showMood: Bool = true) {
         isScreenLocked = locked
-        if locked { overlay.hide() }
+        if locked, showMood {
+            updateLockScreenOverlay()
+        } else {
+            overlay.hide()
+        }
         scheduleIdleCheck()
+    }
+
+    /// บนหน้าล็อก: แสดงหน้าจอเพลงเฉพาะเมื่อมีเพลงอยู่
+    private func updateLockScreenOverlay() {
+        if spotify.track != nil {
+            overlay.show()
+        } else {
+            overlay.hide()
+        }
     }
 }
 

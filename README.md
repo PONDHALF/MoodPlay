@@ -4,9 +4,9 @@
 
 # MoodPlay
 
-**A calm, full-screen "now playing" screen for your Mac, powered by Spotify.**
+**Your Spotify music, right on the Mac Lock Screen.**
 
-When you step away from your desk, MoodPlay fades in an ambient view of the song you're playing: album-colored background, a spinning vinyl (if you like), and time-synced lyrics. Touch anything when you come back and your Mac locks, ready for Touch ID.
+When you step away from your desk, MoodPlay locks your Mac and shows the song you're playing on the Lock Screen: an album-colored glow, the cover or a spinning vinyl, and time-synced lyrics. Unlock with Touch ID as usual, and it gets out of the way.
 
 ![macOS](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)
 ![Swift](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)
@@ -44,14 +44,14 @@ When you step away from your desk, MoodPlay fades in an ambient view of the song
 
 | | |
 |---|---|
-| 🎨 **Album-driven ambience** | The album cover becomes a soft, slowly drifting, color-rich background that crossfades when the track changes. |
-| 💿 **Two themes** | **Album cover**: a large cover with a clean layout. **Vinyl**: a spinning record with the cover as its label and a tonearm that lifts when you pause. |
+| 🔒 **Lives on the Lock Screen** | Your music shows up on the real macOS Lock Screen. The clock, password field, and Touch ID stay exactly where macOS puts them. |
+| 🎨 **Album-driven glow** | Colors from the album cover glow softly from the edges of the screen and crossfade when the track changes. |
+| 💿 **Two themes** | **Album cover**: the cover with the track details. **Vinyl**: a spinning record with the cover as its label and a tonearm that lifts when you pause. |
 | 🎤 **Synced lyrics** | Time-synced lyrics from [LRCLIB](https://lrclib.net). The current line is highlighted and centered, and nearby lines softly blur. Instrumental breaks show animated dots. |
-| ⏱️ **Shows up when you're away** | Appears on its own after 30 s, 1, 2, or 5 minutes of inactivity, but only while music is playing. |
-| ⌨️ **Instant hotkey** | Press **⌘⇧M** to show it right away when you get up. |
-| 🔒 **Locks on return** | Move the mouse, click, scroll, or press any key, and your Mac locks. Unlock with Touch ID or your password as usual. |
-| 🖥️ **Every display** | Covers all connected screens and adapts when displays are added or removed. |
-| 🪶 **Lightweight** | Menu bar only (no Dock icon). It does no work while hidden, and animations run on Core Animation. |
+| ⏱️ **Locks when you're away** | Locks your Mac on its own after 30 s, 1, 2, or 5 minutes of inactivity, but only while music is playing. |
+| ⌨️ **Instant hotkey** | Press **⌘⇧M** to lock right away when you get up. Locking with **⌃⌘Q** shows your music too. |
+| 🖥️ **Every display** | Shows on all connected screens and adapts when displays are added or removed. |
+| 🪶 **Lightweight** | Menu bar only (no Dock icon). It does no work while you're using your Mac, and animations run on Core Animation. |
 | 🔑 **No login required** | No Spotify account connection and no API keys. It talks to the Spotify desktop app locally. |
 
 ---
@@ -147,14 +147,13 @@ No Accessibility or Screen Recording permission is needed. The ⌘⇧M hotkey us
 ## Usage
 
 1. Play something in Spotify.
-2. Walk away. After the idle time you set, MoodPlay fades in on every screen.
-   You can also press **⌘⇧M** (or choose **Show now** in the menu) to show it right away.
-3. Come back and touch the mouse or keyboard. Your Mac **locks** and the overlay fades out.
-   Unlock with **Touch ID** or your password.
+2. Walk away. After the idle time you set, MoodPlay **locks your Mac** and your music fades in on the Lock Screen.
+   You can also press **⌘⇧M** (or choose **Lock & show now** in the menu), or lock the usual way with **⌃⌘Q**.
+3. Come back and unlock with **Touch ID** or your password. The music screen disappears.
 
-> 💡 There's a 2-second grace period after the overlay appears, so a small mouse wobble right after you press the hotkey won't lock the Mac.
+While music is playing, the display stays on so you can enjoy it. Pause the music and the display turns off according to your macOS settings.
 
-**Don't want it to lock while you're just reading?** Turn off **Show automatically when idle**. MoodPlay will then only appear when you ask for it with ⌘⇧M.
+**Don't want your Mac to lock while you're just reading?** Turn off **Lock automatically when idle**. MoodPlay will then only lock when you press ⌘⇧M, and it still shows your music whenever you lock the Mac yourself.
 
 ---
 
@@ -165,11 +164,11 @@ Click the **waveform** icon in the menu bar:
 | Item | Description |
 |---|---|
 | *Now playing* | The current track and whether it's playing or paused. |
-| **Theme** | **Album cover** or **Vinyl**. You can switch while the overlay is showing. |
-| **Show lyrics** | On: cover or vinyl on the left, lyrics on the right. Off: large centered artwork. |
-| **Show automatically** | Show the overlay when the Mac has been idle while music plays. |
-| **Idle time before showing** | 30 seconds, 1, 2, or 5 minutes. |
-| **Show now ⌘⇧M** | Show the overlay immediately. |
+| **Theme** | **Album cover** or **Vinyl**. |
+| **Show lyrics** | On: artwork on the left, lyrics on the right. Off: artwork only. |
+| **Lock automatically when idle** | Lock the Mac and show your music when it has been idle while music plays. |
+| **Idle time before locking** | 30 seconds, 1, 2, or 5 minutes. |
+| **Lock & show now ⌘⇧M** | Lock the Mac immediately and show your music. |
 | **Launch at login** | Start MoodPlay when you log in. |
 | **Quit MoodPlay** | ⌘Q |
 
@@ -179,9 +178,9 @@ Click the **waveform** icon in the menu bar:
 
 ## Recommended macOS settings
 
-MoodPlay keeps the display awake **only while the overlay is showing**. Everywhere else, your normal macOS settings apply.
+MoodPlay keeps the display awake **only while it's on the Lock Screen and music is playing**. Everywhere else, your normal macOS settings apply.
 
-For MoodPlay to appear before your Mac dims or starts the screen saver, open **System Settings → Lock Screen** and set:
+For MoodPlay to lock and show your music before your Mac dims or starts the screen saver, open **System Settings → Lock Screen** and set:
 
 - **Start Screen Saver when inactive** to longer than MoodPlay's idle time (or **Never**)
 - **Turn display off when inactive** to longer than MoodPlay's idle time
@@ -198,16 +197,17 @@ flowchart LR
     M -- AppleScript<br/>(only while visible) --> S
     M -- track change --> L[LyricsStore]
     L -- HTTPS --> R[(LRCLIB)]
-    A[AppModel<br/>idle scheduler] -- show / hide --> O[OverlayController]
-    O --> V[MoodView<br/>on every screen]
+    A[AppModel<br/>idle scheduler] -- lock & show / hide --> O[OverlayController]
+    O -- SkyLight space<br/>above Lock Screen --> V[MoodView<br/>on every screen]
     M --> V
     L --> V
 ```
 
-- **Track info** comes from the distributed notification that Spotify broadcasts on every play, pause, or skip. AppleScript is used only for the first read at launch, for the artwork URL, and to re-sync the position every 3 s while the overlay is showing, in case you seek.
+- **Track info** comes from the distributed notification that Spotify broadcasts on every play, pause, or skip. AppleScript is used only for the first read at launch, for the artwork URL, and to re-sync the position every 3 s while your music is on screen, in case you seek.
 - **Lyrics** are fetched from LRCLIB's `/api/get`, with `/api/search` as a fallback. They're parsed from the LRC format and cached for the 40 most recent tracks.
 - **Idle detection** doesn't poll. MoodPlay works out when the idle threshold will be reached and sets a single timer for that moment.
 - **Locking** uses the same mechanism as the system's Lock Screen command, so you unlock with Touch ID or your password as usual.
+- **Showing on the Lock Screen** uses a private SkyLight (WindowServer) API to create a space above the Lock Screen and place MoodPlay's windows in it. The windows ignore the mouse and keyboard, so authentication is always handled by macOS. If the API isn't available, MoodPlay still locks, just without the music screen.
 
 ---
 
@@ -215,13 +215,13 @@ flowchart LR
 
 MoodPlay is built to be close to free when you're not looking at it.
 
-**While hidden**
+**While you're using your Mac**
 - No repeating timers and no AppleScript calls. It only listens for Spotify's notifications.
-- Artwork isn't downloaded, and the overlay windows and views are destroyed so their memory is freed.
-- Nothing runs while the screen is locked, the display is asleep, the screen saver is active, or another user is logged in.
+- Artwork isn't downloaded, and the music screen's windows and views are destroyed so their memory is freed.
+- Nothing runs while the display is asleep, the screen saver is active, or another user is logged in.
 
-**While showing**
-- Lyrics and the progress bar don't redraw on a fixed timer. Lyrics update only when a new line starts, the progress bar once per second, and the clock once per minute.
+**While on the Lock Screen**
+- Lyrics and the progress bar don't redraw on a fixed timer. Lyrics update only when a new line starts, and the progress bar once per second.
 - The background is a pre-blurred 32 px image scaled up, so there's no full-screen live blur. It drifts using Core Animation, which runs outside the app process.
 - The vinyl record is drawn once per cover and rotated by Core Animation.
 - Only the lyric lines on screen are created.
@@ -263,11 +263,18 @@ This is expected for apps without a paid Developer ID. See [first open instructi
 </details>
 
 <details>
-<summary><b>The overlay never appears on its own</b></summary>
+<summary><b>My Mac never locks on its own</b></summary>
 
-- **Show automatically when idle** must be on, and music must be **playing** (not paused).
+- **Lock automatically when idle** must be on, and music must be **playing** (not paused).
 - Your screen saver or display-off time must be **longer** than MoodPlay's idle time. See [Recommended macOS settings](#recommended-macos-settings).
-- Try **⌘⇧M** to confirm the overlay itself works.
+- Try **⌘⇧M** to confirm locking works.
+</details>
+
+<details>
+<summary><b>The Mac locks, but no music shows on the Lock Screen</b></summary>
+
+- Make sure Spotify has a track loaded. MoodPlay only shows up when there's something to show.
+- A macOS update may have changed the private API MoodPlay uses for the Lock Screen. Please [open an issue](https://github.com/PONDHALF/MoodPlay/issues) with your macOS version.
 </details>
 
 <details>
@@ -302,9 +309,9 @@ Then reopen System Settings.
 
 ## Limitations
 
-- **Can't draw on the real Lock Screen.** macOS doesn't allow third-party windows there, so MoodPlay appears *before* locking instead.
+- **Lock Screen display relies on a private macOS API** (SkyLight). It works on macOS 14 through 27, but a future macOS update could break it. If that happens, MoodPlay still locks your Mac, just without the music screen.
 - **Spotify desktop only.** Apple Music and other players aren't supported yet.
-- **Not on the Mac App Store.** MoodPlay needs App Sandbox off to talk to Spotify, and it uses two private macOS functions (locking the screen and hiding the cursor while in the background). Both fall back to safe alternatives if they're unavailable.
+- **Not on the Mac App Store.** MoodPlay needs App Sandbox off to talk to Spotify, and it uses private macOS functions to lock the screen and to show on the Lock Screen.
 - **Lyrics quality** depends on LRCLIB's community data.
 
 ---
@@ -317,8 +324,8 @@ MoodPlay/
 │                            # lock/sleep handling), themes, global hotkey
 ├── SpotifyMonitor.swift     # Spotify notifications + AppleScript, playback anchor, artwork loading
 ├── LyricsStore.swift        # LRCLIB client, LRC parser, lyrics cache, shared HTTP session
-├── OverlayController.swift  # Full-screen windows, input monitors, screen lock, cursor, power assertion
-├── MoodView.swift           # Overlay UI: background, cover / vinyl, progress, clock, lyrics
+├── OverlayController.swift  # Lock Screen space (SkyLight), windows per screen, screen lock, power assertion
+├── MoodView.swift           # Lock Screen UI: album glow, cover / vinyl, progress, lyrics
 ├── MoodPlay.entitlements    # Apple Events automation entitlement
 └── plan.md                  # Original design plan (Thai)
 scripts/
@@ -333,7 +340,7 @@ Issues and pull requests are welcome. Before opening a PR:
 
 1. Build with **Swift 6 language mode**. The project should compile with no concurrency warnings.
 2. Keep the performance principles above: no work while hidden, and no per-frame SwiftUI updates for things Core Animation can do.
-3. Describe how you tested it (Spotify playing or paused, single or multiple displays).
+3. Describe how you tested it (Spotify playing or paused, single or multiple displays, macOS version).
 
 Ideas on the roadmap: Apple Music support, more themes (e.g. a visualizer), and text colors picked from the album art.
 
@@ -342,6 +349,7 @@ Ideas on the roadmap: Apple Music support, more themes (e.g. a visualizer), and 
 ## Credits
 
 - Lyrics by **[LRCLIB](https://lrclib.net)**, a free and open synced-lyrics database.
+- The Lock Screen technique is based on **[SkyLightWindow](https://github.com/Lakr233/SkyLightWindow)** by Lakr Aream (MIT).
 - Built with SwiftUI, AppKit, and Core Animation.
 
 > MoodPlay isn't affiliated with, endorsed by, or connected to Spotify AB.

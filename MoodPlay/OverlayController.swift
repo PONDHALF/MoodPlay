@@ -9,20 +9,58 @@ import SwiftUI
 import IOKit.pwr_mgt
 import Darwin
 
+/// หน้าต่างบนหน้า Lock Screen ต้องไม่แย่งคีย์บอร์ดจากช่องใส่รหัสผ่านของระบบ
 final class OverlayWindow: NSWindow {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
 }
 
-/// สำรองอีกชั้น: ถ้าเคอร์เซอร์โผล่ขึ้นมาบนหน้าต่างนี้ ให้เป็นภาพโปร่งใส
-final class BlankCursorHostingView: NSHostingView<AnyView> {
-    private static let blankCursor = NSCursor(image: NSImage(size: NSSize(width: 1, height: 1)), hotSpot: .zero)
+/// space พิเศษของ WindowServer ที่อยู่เหนือหน้า Lock Screen (private SkyLight API)
+/// หน้าต่างที่ย้ายเข้ามาจะแสดงบนหน้าล็อก ส่วนช่องรหัสผ่าน/Touch ID ยังเป็นของระบบ
+/// อ้างอิงเทคนิคจาก github.com/Lakr233/SkyLightWindow (MIT)
+@MainActor
+final class LockScreenSpace {
+    static let shared = LockScreenSpace()
 
-    override func resetCursorRects() {
-        addCursorRect(bounds, cursor: Self.blankCursor)
+    private typealias MainConnectionFunction = @convention(c) () -> Int32
+    private typealias SpaceCreateFunction = @convention(c) (Int32, Int32, Int32) -> Int32
+    private typealias SetLevelFunction = @convention(c) (Int32, Int32, Int32) -> Int32
+    private typealias ShowSpacesFunction = @convention(c) (Int32, CFArray) -> Int32
+    private typealias AddWindowsFunction = @convention(c) (Int32, Int32, CFArray, Int32) -> Int32
+
+    /// kSLSSpaceAbsoluteLevelNotificationCenterAtScreenLock (หน้าล็อกอยู่ที่ 300)
+    private static let levelAboveLockScreen: Int32 = 400
+
+    private let connection: Int32
+    private let space: Int32
+    private let addWindows: AddWindowsFunction
+
+    private init?() {
+        guard let handle = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", RTLD_NOW),
+              let mainConnection = dlsym(handle, "SLSMainConnectionID"),
+              let spaceCreate = dlsym(handle, "SLSSpaceCreate"),
+              let setLevel = dlsym(handle, "SLSSpaceSetAbsoluteLevel"),
+              let showSpaces = dlsym(handle, "SLSShowSpaces"),
+              let addWindows = dlsym(handle, "SLSSpaceAddWindowsAndRemoveFromSpaces")
+        else { return nil }
+
+        connection = unsafeBitCast(mainConnection, to: MainConnectionFunction.self)()
+        space = unsafeBitCast(spaceCreate, to: SpaceCreateFunction.self)(connection, 1, 0)
+        guard space != 0 else { return nil }
+        self.addWindows = unsafeBitCast(addWindows, to: AddWindowsFunction.self)
+
+        _ = unsafeBitCast(setLevel, to: SetLevelFunction.self)(connection, space, Self.levelAboveLockScreen)
+        // macOS 27 คืนค่าสุ่มที่ไม่ใช่ 0 ทั้งที่สำเร็จ จึงไม่เช็กผลลัพธ์
+        _ = unsafeBitCast(showSpaces, to: ShowSpacesFunction.self)(connection, [space] as CFArray)
+    }
+
+    func add(_ window: NSWindow) {
+        _ = addWindows(connection, space, [window.windowNumber] as CFArray, 7)
     }
 }
 
+/// แสดงหน้าจอเพลงบนหน้า Lock Screen
+/// ไม่ดักเมาส์/คีย์และไม่ยุ่งกับเคอร์เซอร์: การปลดล็อกเป็นหน้าที่ของ macOS ทั้งหมด
 @MainActor
 final class OverlayController {
     var content: (() -> AnyView)?
@@ -33,41 +71,30 @@ final class OverlayController {
     private(set) var isShowing = false
 
     private var windows: [OverlayWindow] = []
-    private var eventMonitors: [Any] = []
     private var screenObserver: NSObjectProtocol?
     private var assertionID: IOPMAssertionID = 0
     private var hasAssertion = false
-    private var shownAt = Date.distantPast
     private var generation = 0
 
-    private static let gracePeriod: TimeInterval = 2
     private static let fadeInDuration = 1.2
     private static let fadeOutDuration = 0.3
 
+    /// ล็อกเครื่องแล้วแสดงหน้าจอเพลงบนหน้า Lock Screen
+    func lockAndShow() {
+        Self.lockScreen()
+        show()
+    }
+
+    /// แสดงบนหน้า Lock Screen (เรียกตอนเครื่องล็อกอยู่แล้ว ซ้ำได้ไม่มีผล)
     func show() {
-        guard !isShowing, content != nil else { return }
+        guard !isShowing, content != nil, LockScreenSpace.shared != nil else { return }
         isShowing = true
         generation += 1
-        shownAt = Date()
 
         closeWindows() // เผื่อยังเฟดออกจากรอบก่อนไม่เสร็จ
         onShow?()
         buildWindows(alpha: 0)
-
-        NSApp.activate()
-        windows.first?.makeKeyAndOrderFront(nil)
-        Self.setCursorHidden(true)
-        installEventMonitors()
-        preventDisplaySleep()
-
-        screenObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.rebuildWindows() }
-        }
-
+        observeScreens()
         animateAlpha(to: 1, duration: Self.fadeInDuration)
     }
 
@@ -75,15 +102,11 @@ final class OverlayController {
         guard isShowing else { return }
         isShowing = false
 
-        removeEventMonitors()
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
             self.screenObserver = nil
         }
-        Self.setCursorHidden(false)
-        allowDisplaySleep()
-
-        windows.forEach { $0.ignoresMouseEvents = true }
+        setKeepsDisplayAwake(false)
         animateAlpha(to: 0, duration: Self.fadeOutDuration)
         onHide?()
 
@@ -95,10 +118,19 @@ final class OverlayController {
         }
     }
 
+    /// ตอนเพลงเล่นอยู่ให้จอติดค้างไว้ ตอนหยุดปล่อยให้จอดับตามการตั้งค่าของระบบ
+    func setKeepsDisplayAwake(_ awake: Bool) {
+        if awake, isShowing {
+            preventDisplaySleep()
+        } else {
+            allowDisplaySleep()
+        }
+    }
+
     // MARK: - Windows
 
     private func buildWindows(alpha: CGFloat) {
-        guard let content else { return }
+        guard let content, let space = LockScreenSpace.shared else { return }
         for screen in NSScreen.screens {
             let window = OverlayWindow(
                 contentRect: screen.frame,
@@ -113,13 +145,14 @@ final class OverlayController {
             window.isOpaque = false
             window.hasShadow = false
             window.isReleasedWhenClosed = false
-            window.acceptsMouseMovedEvents = true
+            window.ignoresMouseEvents = true
             window.alphaValue = alpha
 
-            let hosting = BlankCursorHostingView(rootView: content())
+            let hosting = NSHostingView(rootView: content())
             hosting.sizingOptions = []
             window.contentView = hosting
             window.orderFrontRegardless()
+            space.add(window)
             windows.append(window)
         }
     }
@@ -137,7 +170,17 @@ final class OverlayController {
         guard isShowing else { return }
         closeWindows()
         buildWindows(alpha: 1)
-        windows.first?.makeKeyAndOrderFront(nil)
+    }
+
+    private func observeScreens() {
+        guard screenObserver == nil else { return }
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.rebuildWindows() }
+        }
     }
 
     /// ให้ WindowServer เฟดทั้งหน้าต่างเอง ไม่ต้อง render SwiftUI ใหม่ทุกเฟรม
@@ -152,41 +195,7 @@ final class OverlayController {
         }
     }
 
-    // MARK: - Events
-
-    private func installEventMonitors() {
-        let mask: NSEvent.EventTypeMask = [
-            .keyDown, .mouseMoved, .scrollWheel,
-            .leftMouseDown, .rightMouseDown, .otherMouseDown,
-            .leftMouseDragged, .rightMouseDragged,
-        ]
-        // local: กลืน event ไม่ให้ทะลุไปถึง view
-        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.userDidInteract() }
-            return nil
-        }) {
-            eventMonitors.append(local)
-        }
-        // global: เผื่อแอปไม่ได้ active
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.userDidInteract() }
-        }) {
-            eventMonitors.append(global)
-        }
-    }
-
-    private func removeEventMonitors() {
-        eventMonitors.forEach(NSEvent.removeMonitor)
-        eventMonitors.removeAll()
-    }
-
-    private func userDidInteract() {
-        // ช่วงผ่อนผันกันเมาส์สั่นตอนเพิ่งกดเปิดจากเมนู
-        guard isShowing, Date().timeIntervalSince(shownAt) >= Self.gracePeriod else { return }
-        // ล็อกก่อนแล้วค่อยปิด overlay จะได้ไม่เห็น desktop โผล่ก่อนหน้า login
-        Self.lockScreen()
-        hide()
-    }
+    // MARK: - Lock
 
     /// พาไปหน้า login ของ macOS (ปลดล็อกด้วย Touch ID หรือรหัสผ่านตามปกติ)
     private static func lockScreen() {
@@ -201,31 +210,6 @@ final class OverlayController {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
         process.arguments = ["displaysleepnow"]
         try? process.run()
-    }
-
-    // MARK: - Cursor
-
-    /// NSCursor.hide() ใช้ได้เฉพาะตอนแอป active ซึ่งแอป menu bar มักไม่ได้ active
-    /// จึงเปิด "SetsCursorInBackground" ก่อน แล้วซ่อนด้วย CGDisplayHideCursor ที่มีผลทั้งระบบ
-    private static func setCursorHidden(_ hidden: Bool) {
-        if hidden {
-            allowCursorChangesInBackground()
-            CGDisplayHideCursor(CGMainDisplayID())
-        } else {
-            CGDisplayShowCursor(CGMainDisplayID())
-        }
-    }
-
-    private static func allowCursorChangesInBackground() {
-        typealias ConnectionFunction = @convention(c) () -> Int32
-        typealias SetPropertyFunction = @convention(c) (Int32, Int32, CFString, CFTypeRef) -> Int32
-        let defaultHandle = UnsafeMutableRawPointer(bitPattern: -2) // RTLD_DEFAULT
-        guard let connectionSymbol = dlsym(defaultHandle, "_CGSDefaultConnection"),
-              let setPropertySymbol = dlsym(defaultHandle, "CGSSetConnectionProperty")
-        else { return }
-        let connection = unsafeBitCast(connectionSymbol, to: ConnectionFunction.self)()
-        let setProperty = unsafeBitCast(setPropertySymbol, to: SetPropertyFunction.self)
-        _ = setProperty(connection, connection, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
     }
 
     // MARK: - Power

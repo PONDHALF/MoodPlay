@@ -29,39 +29,25 @@ struct MoodView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color.black
-
+                // สีจากปกเรืองที่ขอบซ้าย/ขวา กลางจอโปร่งให้เห็นนาฬิกาและช่องปลดล็อกของระบบ
                 AmbientBackground(image: spotify.artwork?.ambient)
 
-                RadialGradient(
-                    colors: [.clear, .black.opacity(0.92)],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: max(geo.size.width, geo.size.height) * 0.75
+                // เงาเข้มที่ขอบให้อ่านตัวหนังสือออกบนทุก wallpaper
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.55), location: 0),
+                        .init(color: .clear, location: 0.4),
+                        .init(color: .clear, location: 0.6),
+                        .init(color: .black.opacity(0.55), location: 1),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
 
                 if let track = spotify.track {
-                    if model.showLyrics {
-                        lyricsLayout(track: track, size: geo.size)
-                            .transition(.opacity)
-                    } else {
-                        centeredLayout(track: track, size: geo.size)
-                            .transition(.opacity)
-                    }
-                } else {
-                    Text("เปิดเพลงใน Spotify แล้วจะขึ้นตรงนี้")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                    layout(track: track, size: geo.size)
+                        .transition(.opacity)
                 }
-
-                ClockView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.top, 48)
-                    .padding(.trailing, 64)
-
-                UnlockHint()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 36)
             }
             .animation(.easeInOut(duration: 0.6), value: model.showLyrics)
             .animation(.easeInOut(duration: 0.6), value: model.theme)
@@ -72,37 +58,31 @@ struct MoodView: View {
         .ignoresSafeArea()
     }
 
-    private func lyricsLayout(track: Track, size: CGSize) -> some View {
-        let cover = min(size.height * 0.42, 440)
-        return HStack(alignment: .center, spacing: size.width * 0.06) {
-            nowPlaying(track: track, coverSize: cover, alignment: .leading)
-                .frame(width: cover * model.theme.artWidthRatio, alignment: .leading)
+    /// ปกอยู่ซ้าย เนื้อเพลงอยู่ขวา กลางจอว่างไว้ให้ระบบ
+    private func layout(track: Track, size: CGSize) -> some View {
+        let cover = min(size.height * 0.3, 320)
+        let side = size.width * 0.3
+        return HStack(alignment: .center, spacing: 0) {
+            NowPlayingColumn(
+                track: track,
+                theme: model.theme,
+                cover: currentCover,
+                coverKey: coverKey,
+                coverSize: cover,
+                isPlaying: spotify.isPlaying,
+                clock: clock
+            )
+            .frame(width: side, alignment: .leading)
 
-            LyricsPanel(lyrics: lyrics, clock: clock)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, 160)
-                .padding(.bottom, 60)
+            Spacer(minLength: 0)
+
+            if model.showLyrics {
+                LyricsPanel(lyrics: lyrics, clock: clock)
+                    .frame(width: side)
+                    .frame(maxHeight: size.height * 0.6)
+            }
         }
-        .padding(.horizontal, size.width * 0.07)
-    }
-
-    private func centeredLayout(track: Track, size: CGSize) -> some View {
-        let cover = min(size.height * 0.5, 560)
-        return nowPlaying(track: track, coverSize: cover, alignment: .center)
-            .frame(width: max(cover * model.theme.artWidthRatio, min(size.width * 0.6, 760)))
-    }
-
-    private func nowPlaying(track: Track, coverSize: CGFloat, alignment: HorizontalAlignment) -> some View {
-        NowPlayingColumn(
-            track: track,
-            theme: model.theme,
-            cover: currentCover,
-            coverKey: coverKey,
-            coverSize: coverSize,
-            isPlaying: spotify.isPlaying,
-            clock: clock,
-            alignment: alignment
-        )
+        .padding(.horizontal, size.width * 0.05)
     }
 }
 
@@ -121,6 +101,7 @@ private struct AmbientBackground: NSViewRepresentable {
 
 final class AmbientLayerView: NSView {
     private let imageLayer = CALayer()
+    private let edgeMask = CAGradientLayer()
     private var currentImage: CGImage?
 
     override init(frame: NSRect) {
@@ -135,6 +116,16 @@ final class AmbientLayerView: NSView {
         imageLayer.opacity = 0.65
         imageLayer.actions = ["bounds": NSNull(), "position": NSNull(), "contents": NSNull()]
         root.addSublayer(imageLayer)
+
+        // ทึบที่ขอบ โปร่งกลางจอ
+        let opaque = NSColor.black.cgColor
+        let clear = NSColor.clear.cgColor
+        edgeMask.colors = [opaque, clear, clear, opaque]
+        edgeMask.locations = [0, 0.38, 0.62, 1]
+        edgeMask.startPoint = CGPoint(x: 0, y: 0.5)
+        edgeMask.endPoint = CGPoint(x: 1, y: 0.5)
+        edgeMask.actions = ["bounds": NSNull(), "position": NSNull()]
+        root.mask = edgeMask
 
         let scale = CABasicAnimation(keyPath: "transform.scale")
         scale.fromValue = 1.2
@@ -160,6 +151,7 @@ final class AmbientLayerView: NSView {
         super.layout()
         imageLayer.bounds = bounds
         imageLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        edgeMask.frame = bounds
     }
 
     func setImage(_ image: CGImage?) {
@@ -183,20 +175,15 @@ private struct NowPlayingColumn: View {
     let coverSize: CGFloat
     let isPlaying: Bool
     let clock: PlaybackClock
-    let alignment: HorizontalAlignment
-
-    private var textAlignment: TextAlignment { alignment == .center ? .center : .leading }
 
     var body: some View {
-        VStack(alignment: alignment, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             Group {
                 switch theme {
                 case .cover:
                     CoverArt(image: cover, key: coverKey, size: coverSize)
                 case .vinyl:
-                    // ชดเชยความกว้างของแขนเข็มด้านขวา ให้แผ่นอยู่กลางจอจริงตอนจัดกึ่งกลาง
                     VinylPlayer(cover: cover, size: coverSize, isPlaying: isPlaying)
-                        .padding(.leading, alignment == .center ? coverSize * (OverlayTheme.vinyl.artWidthRatio - 1) : 0)
                 }
             }
             .padding(.bottom, 40)
@@ -204,7 +191,7 @@ private struct NowPlayingColumn: View {
             Text(track.name)
                 .font(.system(size: 40, weight: .bold))
                 .tracking(-0.8)
-                .multilineTextAlignment(textAlignment)
+                .multilineTextAlignment(.leading)
                 .lineLimit(2)
                 .minimumScaleFactor(0.6)
                 .padding(.bottom, 8)
@@ -525,37 +512,6 @@ private struct ToneArm: View {
         }
         .frame(width: scale * 0.05, height: length + scale * 0.05, alignment: .top)
         .shadow(color: .black.opacity(0.5), radius: 10, x: 4, y: 8)
-    }
-}
-
-// MARK: - Clock / hint
-
-/// เปลี่ยนแค่นาทีละครั้ง
-private struct ClockView: View {
-    var body: some View {
-        TimelineView(.everyMinute) { context in
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(context.date, format: .dateTime.hour().minute())
-                    .font(.system(size: 64, weight: .semibold, design: .rounded).monospacedDigit())
-                    .tracking(-2)
-                    .foregroundStyle(.white.opacity(0.92))
-                Text(context.date, format: .dateTime.weekday(.wide).day().month(.abbreviated))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.55))
-            }
-        }
-    }
-}
-
-private struct UnlockHint: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 12, weight: .bold))
-            Text("แตะเพื่อปลดล็อก")
-                .font(.system(size: 13, weight: .semibold))
-        }
-        .foregroundStyle(.white.opacity(0.4))
     }
 }
 
