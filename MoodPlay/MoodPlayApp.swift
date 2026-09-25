@@ -7,7 +7,6 @@
 
 import Combine
 import SwiftUI
-import Carbon.HIToolbox
 import ServiceManagement
 
 @main
@@ -45,8 +44,6 @@ struct MenuContent: View {
         }
         Toggle("Show Lyrics", isOn: $model.showLyrics)
         Divider()
-        Button("Lock & Show Now  ⌘⇧M") { model.showNow() }
-        Divider()
         Toggle("Launch at Login", isOn: Binding(
             get: { model.launchAtLogin },
             set: { model.setLaunchAtLogin($0) }
@@ -80,7 +77,6 @@ final class AppModel: ObservableObject {
     /// อ่านจากระบบทุกครั้ง เพราะผู้ใช้ปิดได้เองจาก System Settings → Login Items
     @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
 
-    private var hotKey: GlobalHotKey?
     private var systemObservers: [NSObjectProtocol] = []
     /// หน้าจอล็อกอยู่ / สลับผู้ใช้ไปแล้ว: ห้ามขึ้น overlay ไปแอบกินแบตอยู่หลังหน้าล็อก
     private var isScreenLocked = false
@@ -114,20 +110,6 @@ final class AppModel: ObservableObject {
         spotify.start()
 
         observeSystem()
-
-        // ⌘⇧M: ล็อกทันทีตอนลุกจากโต๊ะ
-        hotKey = GlobalHotKey(keyCode: UInt32(kVK_ANSI_M), modifiers: UInt32(cmdKey | shiftKey)) { [weak self] in
-            self?.showNow()
-        }
-    }
-
-    func showNow() {
-        guard !isScreenLocked else { return }
-        // ให้เมนูปิดให้เรียบร้อยก่อนค่อยล็อก
-        Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
-            self?.overlay.lockAndShow()
-        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -234,28 +216,5 @@ enum OverlayTheme: String, CaseIterable, Identifiable {
         case .cover: 1
         case .vinyl: 1.18
         }
-    }
-}
-
-// MARK: - Global hotkey
-
-/// ใช้ Carbon hotkey เพราะไม่ต้องขอสิทธิ์ Accessibility
-@MainActor
-final class GlobalHotKey {
-    private static var action: (@MainActor () -> Void)?
-
-    private var hotKeyRef: EventHotKeyRef?
-    private var handlerRef: EventHandlerRef?
-
-    init(keyCode: UInt32, modifiers: UInt32, action: @escaping @MainActor () -> Void) {
-        Self.action = action
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            MainActor.assumeIsolated { GlobalHotKey.action?() }
-            return noErr
-        }, 1, &eventType, nil, &handlerRef)
-
-        let id = EventHotKeyID(signature: OSType(0x4D4F4F44), id: 1) // 'MOOD'
-        RegisterEventHotKey(keyCode, modifiers, id, GetApplicationEventTarget(), 0, &hotKeyRef)
     }
 }

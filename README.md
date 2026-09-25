@@ -49,7 +49,7 @@ Whenever your Mac is locked, MoodPlay shows the song you're playing right on the
 | 🎯 **Smart layout** | With lyrics: artwork on the left, lyrics on the right. Without lyrics (turned off, not found, or instrumental): everything is centered. Both fit between the system clock and the unlock controls. |
 | 💿 **Two themes** | **Album Cover**: the cover with the track details. **Vinyl**: a spinning record with the cover as its label and a tonearm that lifts when you pause. |
 | 🎤 **Synced lyrics** | Time-synced lyrics from [LRCLIB](https://lrclib.net). The current line is highlighted and centered, and nearby lines softly blur. Instrumental breaks show animated dots. |
-| 🔐 **Follows macOS locking** | Shows up however your Mac gets locked: automatically by macOS, with **⌃⌘Q**, or with MoodPlay's **⌘⇧M** hotkey. |
+| 🔐 **Follows macOS locking** | Shows up however your Mac gets locked: automatically by macOS, or with **⌃⌘Q**. |
 | 🖥️ **Every display** | Shows on all connected screens and adapts when displays are added or removed. |
 | 🪶 **Lightweight** | Menu bar only (no Dock icon). It does no work while you're using your Mac, and animations run on Core Animation. |
 | 🔑 **No login required** | No Spotify account connection and no API keys. It talks to the Spotify desktop app locally. |
@@ -140,24 +140,21 @@ Click **OK** when macOS asks. MoodPlay **never launches Spotify by itself**. It 
 > **Denied by accident?** The menu shows a warning with a shortcut to the right settings page.
 > You can also go to **System Settings → Privacy & Security → Automation → MoodPlay** and enable **Spotify**.
 
-No Accessibility or Screen Recording permission is needed. The ⌘⇧M hotkey uses the system hotkey API.
+No Accessibility or Screen Recording permission is needed.
 
 ---
 
 ## Usage
 
 1. Play something in Spotify.
-2. Lock your Mac any way you like:
-   - press **⌘⇧M** (or choose **Lock & Show Now** in the menu) when you get up,
-   - press **⌃⌘Q**, or
-   - let macOS lock it automatically.
+2. Lock your Mac as usual: press **⌃⌘Q** when you get up, or let macOS lock it automatically.
 
    Your music fades in on the Lock Screen.
 3. Come back and unlock with **Touch ID** or your password. The music screen disappears.
 
 While music is playing, the display stays on so you can enjoy it. Pause the music and the display turns off according to your macOS settings.
 
-> 💡 When macOS locks on its own, it usually turns the display off at the same time. Your music appears as soon as you wake the display. To keep it on screen while you're away, lock with **⌘⇧M** or **⌃⌘Q** instead.
+> 💡 When macOS locks on its own, it usually turns the display off at the same time. Your music appears as soon as you wake the display. To keep it on screen while you're away, lock with **⌃⌘Q** instead.
 
 ---
 
@@ -170,7 +167,6 @@ Click the **waveform** icon in the menu bar:
 | *Now Playing* | The current track and whether it's playing or paused. |
 | **Theme** | **Album Cover** or **Vinyl**. |
 | **Show Lyrics** | On: artwork on the left, lyrics on the right. Off: artwork and track details centered. |
-| **Lock & Show Now ⌘⇧M** | Lock the Mac immediately and show your music. |
 | **Launch at Login** | Start MoodPlay when you log in. |
 | **Quit MoodPlay** | ⌘Q |
 
@@ -263,7 +259,7 @@ This is expected for apps without a paid Developer ID. See [first open instructi
 <details>
 <summary><b>My Mac never locks on its own</b></summary>
 
-Automatic locking is controlled by macOS, not MoodPlay. See [Recommended macOS settings](#recommended-macos-settings). You can always lock right away with **⌘⇧M** or **⌃⌘Q**.
+Automatic locking is controlled by macOS, not MoodPlay. See [Recommended macOS settings](#recommended-macos-settings). You can always lock right away with **⌃⌘Q**.
 </details>
 
 <details>
@@ -271,12 +267,6 @@ Automatic locking is controlled by macOS, not MoodPlay. See [Recommended macOS s
 
 - Make sure Spotify has a track loaded. MoodPlay only shows up when there's something to show.
 - A macOS update may have changed the private API MoodPlay uses for the Lock Screen. Please [open an issue](https://github.com/PONDHALF/MoodPlay/issues) with your macOS version.
-</details>
-
-<details>
-<summary><b>⌘⇧M does nothing</b></summary>
-
-Another app may already use ⌘⇧M. Quit apps with global shortcuts one at a time to find the conflict.
 </details>
 
 <details>
@@ -307,7 +297,7 @@ Then reopen System Settings.
 
 - **Lock Screen display relies on a private macOS API** (SkyLight). It works on macOS 14 through 27, but a future macOS update could break it. If that happens, MoodPlay still locks your Mac, just without the music screen.
 - **Spotify desktop only.** Apple Music and other players aren't supported yet.
-- **Not on the Mac App Store.** MoodPlay needs App Sandbox off to talk to Spotify, and it uses private macOS functions to lock the screen and to show on the Lock Screen.
+- **Not on the Mac App Store.** MoodPlay needs App Sandbox off to talk to Spotify, and it uses a private macOS API to show on the Lock Screen.
 - **Lyrics quality** depends on LRCLIB's community data.
 
 ---
@@ -317,7 +307,7 @@ Then reopen System Settings.
 ```
 MoodPlay/
 ├── MoodPlayApp.swift        # App entry, menu bar menu, AppModel (settings, lock/sleep handling),
-│                            # themes, global hotkey
+│                            # themes
 ├── SpotifyMonitor.swift     # Spotify notifications + AppleScript, playback anchor, artwork loading
 ├── LyricsStore.swift        # LRCLIB client, LRC parser, lyrics cache, shared HTTP session
 ├── OverlayController.swift  # Lock Screen space (SkyLight), windows per screen, screen lock, power assertion

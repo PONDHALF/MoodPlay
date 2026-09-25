@@ -79,12 +79,6 @@ final class OverlayController {
     private static let fadeInDuration = 1.2
     private static let fadeOutDuration = 0.3
 
-    /// ล็อกเครื่องแล้วแสดงหน้าจอเพลงบนหน้า Lock Screen
-    func lockAndShow() {
-        Self.lockScreen()
-        show()
-    }
-
     /// แสดงบนหน้า Lock Screen (เรียกตอนเครื่องล็อกอยู่แล้ว ซ้ำได้ไม่มีผล)
     func show() {
         guard !isShowing, content != nil, LockScreenSpace.shared != nil else { return }
@@ -193,23 +187,6 @@ final class OverlayController {
                 window.animator().alphaValue = value
             }
         }
-    }
-
-    // MARK: - Lock
-
-    /// พาไปหน้า login ของ macOS (ปลดล็อกด้วย Touch ID หรือรหัสผ่านตามปกติ)
-    private static func lockScreen() {
-        typealias LockFunction = @convention(c) () -> Int32
-        if let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_LAZY),
-           let symbol = dlsym(handle, "SACLockScreenImmediate") {
-            _ = unsafeBitCast(symbol, to: LockFunction.self)()
-            return
-        }
-        // สำรอง: ปิดจอ ซึ่งจะล็อกเครื่องถ้าตั้ง "ต้องใส่รหัสผ่านทันที" ไว้ใน System Settings
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
-        process.arguments = ["displaysleepnow"]
-        try? process.run()
     }
 
     // MARK: - Power
